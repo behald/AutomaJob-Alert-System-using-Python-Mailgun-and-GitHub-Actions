@@ -1,0 +1,8 @@
+
+services:
+  - type: worker
+    name: h1b-job-alerts
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python main.py"
