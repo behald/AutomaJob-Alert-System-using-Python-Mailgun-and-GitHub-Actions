@@ -1,19 +1,17 @@
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from datetime import datetime
-import json, os, time
+import json
+import os
 
 # --- CONFIG ---
-FROM_EMAIL = "h1b.job.alerts@gmail.com"
-TO_EMAIL = "behal.divaye@gmail.com"
-EMAIL_PASSWORD = "bhux ajec utjz ovby"  # <-- replace this
+MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY")
+MAILGUN_DOMAIN = os.getenv("MAILGUN_DOMAIN")
+TO_EMAIL = os.getenv("TO_EMAIL", "behal.divaye@gmail.com")
+
 CSV_FILE = "company_data.csv"
 SEEN_FILE = "seen_jobs.json"
-CHECK_INTERVAL = 300  # 300 seconds = 5 minutes
 
 # --- BUILD SEARCH QUERY ---
 def build_query(company):
@@ -56,28 +54,51 @@ def get_google_results(query):
 def load_seen():
     if os.path.exists(SEEN_FILE):
         with open(SEEN_FILE, "r") as f:
-            return set(json.load(f))
+            try:
+                return set(json.load(f))
+            except Exception:
+                return set()
     return set()
 
 def save_seen(seen):
     with open(SEEN_FILE, "w") as f:
         json.dump(list(seen), f)
 
-# --- EMAIL FUNCTION ---
-def send_email(subject, body):
-    msg = MIMEMultipart("alternative")
-    msg["From"] = FROM_EMAIL
-    msg["To"] = TO_EMAIL
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "html"))
+# --- EMAIL FUNCTION (Mailgun API) ---
+def send_email(subject, html_body):
+    if not MAILGUN_API_KEY or not MAILGUN_DOMAIN:
+        print("❌ Mailgun credentials missing. Please set MAILGUN_API_KEY and MAILGUN_DOMAIN.")
+        return False
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(FROM_EMAIL, EMAIL_PASSWORD)
-        server.send_message(msg)
+    response = requests.post(
+        f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
+        auth=("api", MAILGUN_API_KEY),
+        data={
+            "from": f"Job Alerts <alerts@{MAILGUN_DOMAIN}>",
+            "to": [TO_EMAIL],
+            "subject": subject,
+            "html": html_body,
+        },
+    )
+
+    if response.status_code == 200:
+        print("✅ Email sent successfully.")
+        return True
+    else:
+        print(f"❌ Mailgun error {response.status_code}: {response.text}")
+        return False
 
 # --- MAIN FUNCTION ---
 def main():
+    if not os.path.exists(CSV_FILE):
+        print(f"❌ Missing file: {CSV_FILE}")
+        return
+
     df = pd.read_csv(CSV_FILE)
+    if "EMPLOYER_NAME" not in df.columns:
+        print("❌ Column 'EMPLOYER_NAME' not found in CSV.")
+        return
+
     companies = df["EMPLOYER_NAME"].dropna().head(150)
 
     seen = load_seen()
@@ -93,7 +114,7 @@ def main():
                 for l in fresh_links:
                     seen.add(l)
         except Exception as e:
-            print(f"Error fetching {company}: {e}")
+            print(f"⚠️ Error fetching {company}: {e}")
 
     if new_results:
         today = datetime.now().strftime("%b %d, %Y %H:%M")
@@ -107,10 +128,9 @@ def main():
         print(f"✅ Email sent with {len(new_results)} new updates.")
     else:
         print("No new jobs found.")
+
     save_seen(seen)
 
-# --- LOOP EVERY 5 MINUTES ---
+# --- ENTRYPOINT ---
 if __name__ == "__main__":
-    while True:
-        main()
-        time.sleep(CHECK_INTERVAL)
+    main()
