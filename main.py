@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import json
 import os
+import time
 
 # --- CONFIG ---
 MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY")
@@ -13,32 +14,20 @@ TO_EMAIL = os.getenv("TO_EMAIL", "behal.divaye@gmail.com")
 CSV_FILE = "company_data.csv"
 SEEN_FILE = "seen_jobs.json"
 
-# --- BUILD SEARCH QUERY (USA-focused) ---
+DEBUG = True  # Set False to silence debug prints
+
+
+# --- BUILD SEARCH QUERY (simplified + US focused) ---
 def build_query(company):
-    exp_keywords = (
-        '"entry level" OR "new grad" OR "graduate" OR "junior" OR "0-1 years" OR "0-2 years" '
-        'OR "master student" OR "recent graduate" OR "early career" OR "fresh graduate"'
-    )
-
-    role_keywords = (
-        '"data engineer" OR "backend engineer" OR "data analyst" OR "business analyst" OR '
-        '"bi engineer" OR "analytics engineer" OR "cloud engineer" OR "software engineer" OR '
-        '"data scientist" OR "ml engineer" OR "ai engineer" OR "data analytics" OR '
-        '"big data" OR "etl engineer" OR "python developer" OR "sql analyst" OR '
-        '"power bi" OR "tableau" OR "aws engineer" OR "azure engineer" OR "gcp engineer"'
-    )
-
     company_clean = company.lower().replace(" ", "")
-
-    # Add "United States" to query
     query = (
-        f'(site:careers.{company_clean}.com OR site:greenhouse.io OR site:myworkdayjobs.com OR site:lever.co) '
-        f'({exp_keywords}) AND ({role_keywords}) "United States" "{company}"'
+        f'site:({company_clean}.myworkdayjobs.com OR {company_clean}.jobs OR careers.{company_clean}.com '
+        f'OR greenhouse.io OR lever.co) "data" ("entry level" OR "new grad" OR "junior") "United States" "{company}"'
     )
     return query
 
 
-# --- SCRAPE GOOGLE RESULTS (Clean + US Only) ---
+# --- SCRAPE GOOGLE RESULTS ---
 def get_google_results(query):
     headers = {"User-Agent": "Mozilla/5.0"}
     url = f"https://www.google.com/search?q={requests.utils.quote(query)}"
@@ -57,14 +46,14 @@ def get_google_results(query):
                 "myworkdayjobs.com",
                 "lever.co",
                 "careers.",
-                "jobs.",
+                ".jobs",
                 "boards.",
                 "apply.",
                 "workwithus.",
                 "smartrecruiters.com"
             ]) and not clean_link.startswith("https://maps.google"):
-                
-                # Skip non-US job URLs
+
+                # Skip obvious non-US country patterns
                 if any(country in clean_link.lower() for country in [
                     "/uk/", "/ca/", "/in/", "/au/", "/eu/", "/sg/", "/de/", "/fr/", "/ph/", "/mx/"
                 ]):
@@ -72,7 +61,7 @@ def get_google_results(query):
 
                 links.append(clean_link)
 
-    # Remove duplicates and limit to 5 links
+    # Remove duplicates, limit to 5
     return list(dict.fromkeys(links))[:5]
 
 
@@ -92,13 +81,12 @@ def save_seen(seen):
         json.dump(list(seen), f)
 
 
-# --- SEND EMAIL (Mailgun API) ---
+# --- SEND EMAIL ---
 def send_email(subject, html_body):
     if not MAILGUN_API_KEY or not MAILGUN_DOMAIN:
         print("❌ Mailgun credentials missing. Please set MAILGUN_API_KEY and MAILGUN_DOMAIN.")
         return False
 
-    # Adjust key format (some Mailgun accounts omit "key-" prefix)
     api_key = MAILGUN_API_KEY if MAILGUN_API_KEY.startswith("key-") else f"key-{MAILGUN_API_KEY}"
 
     response = requests.post(
@@ -120,7 +108,7 @@ def send_email(subject, html_body):
         return False
 
 
-# --- MAIN JOB ALERT FUNCTION ---
+# --- MAIN ---
 def main():
     if not os.path.exists(CSV_FILE):
         print(f"❌ Missing file: {CSV_FILE}")
@@ -131,20 +119,33 @@ def main():
         print("❌ Column 'EMPLOYER_NAME' not found in CSV.")
         return
 
-    # Target all employers from CSV
     companies = df["EMPLOYER_NAME"].dropna().tolist()
-
     seen = load_seen()
     new_results = {}
 
     for company in companies:
         try:
             query = build_query(company)
+            if DEBUG:
+                print(f"\n🔍 Searching for {company}...")
             links = get_google_results(query)
+
+            # If nothing found, retry with broader query
+            if not links:
+                if DEBUG:
+                    print(f"⚠️ No results for {company}, retrying with fallback query...")
+                fallback = f'site:({company}.com OR myworkdayjobs.com OR lever.co OR greenhouse.io) "{company}" "data" "United States"'
+                links = get_google_results(fallback)
+
+            if DEBUG:
+                print(f"Found {len(links)} links: {links}")
+
             fresh_links = [l for l in links if l not in seen]
             if fresh_links:
                 new_results[company] = fresh_links
                 seen.update(fresh_links)
+
+            time.sleep(1)  # avoid too many Google requests quickly
         except Exception as e:
             print(f"⚠️ Error fetching {company}: {e}")
 
@@ -160,11 +161,10 @@ def main():
         send_email("🚨 New Entry-Level U.S. Job Posted", body)
         print(f"✅ Email sent with {len(new_results)} company updates.")
     else:
-        print("No new U.S. jobs found.")
+        print("No new U.S. jobs found. (Try relaxing filters or wait for new postings.)")
 
     save_seen(seen)
 
 
-# --- ENTRYPOINT ---
 if __name__ == "__main__":
     main()
