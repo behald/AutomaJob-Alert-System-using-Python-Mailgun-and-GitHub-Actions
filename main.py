@@ -87,10 +87,19 @@ def send_email(subject, html_body):
         print("❌ Mailgun credentials missing. Please set MAILGUN_API_KEY and MAILGUN_DOMAIN.")
         return False
 
-    api_key = MAILGUN_API_KEY if MAILGUN_API_KEY.startswith("key-") else f"key-{MAILGUN_API_KEY}"
+    # Detect region automatically
+    api_base = (
+        "https://api.eu.mailgun.net/v3"
+        if ".eu." in MAILGUN_DOMAIN
+        else "https://api.mailgun.net/v3"
+    )
+
+    api_key = MAILGUN_API_KEY.strip()
+    if not api_key.startswith("key-"):
+        api_key = f"key-{api_key}"
 
     response = requests.post(
-        f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
+        f"{api_base}/{MAILGUN_DOMAIN}/messages",
         auth=("api", api_key),
         data={
             "from": f"Job Alerts <alerts@{MAILGUN_DOMAIN}>",
@@ -100,12 +109,22 @@ def send_email(subject, html_body):
         },
     )
 
+    # --- Detailed diagnostics ---
     if response.status_code == 200:
         print("✅ Email sent successfully.")
         return True
+    elif response.status_code == 401:
+        print("❌ Mailgun authentication failed (401).")
+        print("🔑 Possible causes:")
+        print("   • Wrong API key or missing 'key-' prefix.")
+        print("   • Incorrect Mailgun domain.")
+        print("   • Free account: recipient not verified.")
+        print("   • Region mismatch (EU vs US).")
     else:
         print(f"❌ Mailgun error {response.status_code}: {response.text}")
-        return False
+
+    return False
+
 
 
 # --- MAIN ---
