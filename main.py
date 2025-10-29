@@ -95,8 +95,7 @@ def send_email(subject, html_body):
     )
 
     api_key = MAILGUN_API_KEY.strip()
-    if not api_key.startswith("key-"):
-        api_key = f"key-{api_key}"
+
 
     response = requests.post(
         f"{api_base}/{MAILGUN_DOMAIN}/messages",
