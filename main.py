@@ -28,41 +28,55 @@ def build_query(company):
 
 
 # --- SCRAPE GOOGLE RESULTS ---
+from urllib.parse import unquote
+
 def get_google_results(query):
     headers = {"User-Agent": "Mozilla/5.0"}
-    url = f"https://www.google.com/search?q={requests.utils.quote(query)}"
+    url = f"https://www.google.com/search?q={requests.utils.quote(query)}&num=10"
     res = requests.get(url, headers=headers)
     soup = BeautifulSoup(res.text, "html.parser")
 
     links = []
-    for g in soup.find_all("a", href=True):
-        href = g["href"]
-        if href.startswith("/url?q="):
-            clean_link = href.split("/url?q=")[1].split("&")[0]
+    for tag in soup.find_all("a", href=True):
+        href = tag["href"]
 
-            # Keep only real job-related domains
-            if any(domain in clean_link for domain in [
+        # Only keep Google redirect links that start correctly
+        if href.startswith("/url?q="):
+            clean_link = unquote(href.split("/url?q=")[1].split("&")[0])
+
+            # Filter: must contain official career/job sites
+            valid_domains = (
                 "greenhouse.io",
                 "myworkdayjobs.com",
                 "lever.co",
+                "smartrecruiters.com",
                 "careers.",
                 ".jobs",
-                "boards.",
                 "apply.",
                 "workwithus.",
-                "smartrecruiters.com"
-            ]) and not clean_link.startswith("https://maps.google"):
+            )
 
-                # Skip obvious non-US country patterns
-                if any(country in clean_link.lower() for country in [
-                    "/uk/", "/ca/", "/in/", "/au/", "/eu/", "/sg/", "/de/", "/fr/", "/ph/", "/mx/"
-                ]):
+            if (
+                any(domain in clean_link for domain in valid_domains)
+                and not clean_link.startswith("https://accounts.google.com")
+                and not clean_link.startswith("https://www.google.com")
+                and not clean_link.endswith(".pdf")
+                and not "support.google" in clean_link
+                and not "recruiting-resources" in clean_link
+                and not "youtube.com" in clean_link
+            ):
+                # Skip non-US job pages
+                if any(
+                    country in clean_link.lower()
+                    for country in ["/uk/", "/ca/", "/in/", "/au/", "/eu/", "/sg/", "/de/", "/fr/", "/ph/", "/mx/"]
+                ):
                     continue
 
                 links.append(clean_link)
 
-    # Remove duplicates, limit to 5
+    # Deduplicate and limit
     return list(dict.fromkeys(links))[:5]
+
 
 
 # --- LOAD/SAVE SEEN JOBS ---
