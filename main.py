@@ -37,7 +37,7 @@ from urllib.parse import unquote
 def get_google_results(query, company=None):
     headers = {"User-Agent": "Mozilla/5.0"}
     # 👇 Only fetch results from the past 24 hours
-    url = f"https://www.google.com/search?q={requests.utils.quote(query)}&num=10&tbs=qdr:d"
+    url = f"https://www.google.com/search?q={requests.utils.quote(query)}&num=10&tbs=qdr:m"
     res = requests.get(url, headers=headers)
     soup = BeautifulSoup(res.text, "html.parser")
 
@@ -85,7 +85,6 @@ def get_google_results(query, company=None):
 
     # Remove duplicates and limit
     return list(dict.fromkeys(links))[:5]
-
 
 
 
