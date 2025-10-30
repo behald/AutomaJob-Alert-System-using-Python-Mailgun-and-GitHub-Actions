@@ -30,21 +30,27 @@ def build_query(company):
 # --- SCRAPE GOOGLE RESULTS ---
 from urllib.parse import unquote
 
-def get_google_results(query):
+from urllib.parse import unquote
+
+from urllib.parse import unquote
+
+def get_google_results(query, company=None):
     headers = {"User-Agent": "Mozilla/5.0"}
-    url = f"https://www.google.com/search?q={requests.utils.quote(query)}&num=10"
+    # 👇 Only fetch results from the past 24 hours
+    url = f"https://www.google.com/search?q={requests.utils.quote(query)}&num=10&tbs=qdr:d"
     res = requests.get(url, headers=headers)
     soup = BeautifulSoup(res.text, "html.parser")
 
     links = []
+    company_clean = (company or "").lower().replace(" ", "")
+
     for tag in soup.find_all("a", href=True):
         href = tag["href"]
 
-        # Only keep Google redirect links that start correctly
         if href.startswith("/url?q="):
             clean_link = unquote(href.split("/url?q=")[1].split("&")[0])
 
-            # Filter: must contain official career/job sites
+            # Filter for real career/job sites only
             valid_domains = (
                 "greenhouse.io",
                 "myworkdayjobs.com",
@@ -58,24 +64,30 @@ def get_google_results(query):
 
             if (
                 any(domain in clean_link for domain in valid_domains)
-                and not clean_link.startswith("https://accounts.google.com")
-                and not clean_link.startswith("https://www.google.com")
-                and not clean_link.endswith(".pdf")
+                and not clean_link.startswith(("https://accounts.google.com", "https://maps.google.com"))
                 and not "support.google" in clean_link
                 and not "recruiting-resources" in clean_link
                 and not "youtube.com" in clean_link
             ):
-                # Skip non-US job pages
+                # Skip non-US patterns
                 if any(
                     country in clean_link.lower()
                     for country in ["/uk/", "/ca/", "/in/", "/au/", "/eu/", "/sg/", "/de/", "/fr/", "/ph/", "/mx/"]
                 ):
                     continue
 
+                # Keep only if company name appears
+                if company_clean and company_clean not in clean_link.lower():
+                    if not any(token in clean_link.lower() for token in company_clean.split()):
+                        continue
+
                 links.append(clean_link)
 
-    # Deduplicate and limit
+    # Remove duplicates and limit
     return list(dict.fromkeys(links))[:5]
+
+
+
 
 
 
