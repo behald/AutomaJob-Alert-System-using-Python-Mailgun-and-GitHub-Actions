@@ -21,8 +21,8 @@ DEBUG = True  # Set False to silence debug prints
 def build_query(company):
     company_clean = company.lower().replace(" ", "")
     query = (
-        f'site:({company_clean}.myworkdayjobs.com OR {company_clean}.jobs OR careers.{company_clean}.com '
-        f'OR greenhouse.io OR lever.co) "data" ("entry level" OR "new grad" OR "junior") "United States" "{company}"'
+        f'site:({company_clean}.myworkdayjobs.com OR careers.{company_clean}.com OR greenhouse.io OR lever.co)'
+        f'("{company}" AND ("data" OR "analytics" OR "engineer" OR "analyst")) "United States"'
     )
     return query
 
@@ -37,8 +37,11 @@ from urllib.parse import unquote
 def get_google_results(query, company=None):
     headers = {"User-Agent": "Mozilla/5.0"}
     # 👇 Only fetch results from the past 24 hours
-    url = f"https://www.google.com/search?q={requests.utils.quote(query)}&num=10&tbs=qdr:m"
+    url = f"https://www.google.com/search?q={requests.utils.quote(query)}&num=30&tbs=qdr:m"
     res = requests.get(url, headers=headers)
+    print(f"[DEBUG] Google URL used: {url}")
+    print(f"[DEBUG] Response length: {len(res.text)}")
+
     soup = BeautifulSoup(res.text, "html.parser")
 
     links = []
