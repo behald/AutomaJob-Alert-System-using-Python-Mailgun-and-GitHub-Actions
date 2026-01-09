@@ -16,10 +16,10 @@ It:
 > After you push the screenshots to GitHub, these images will show as proof that the system works end-to-end.
 
 ### GitHub Actions scheduled runs (automation proof)
-![GitHub Actions scheduled runs](screenshots/actions_result.png)
+![GitHub Actions scheduled runs](github_action_project/actions_result.png)
 
 ### Mailgun email received (notification proof)
-![Mailgun email success](screenshots/mailgun_notifications%20work%20.png)
+![Mailgun email success](github_action_project/mailgun_notifications%20work%20.png)
 
 ---
 
@@ -72,7 +72,7 @@ If a link is already in `seen_jobs.json`, it is skipped.
 Sends one email that groups results **company-wise**.
 
 **Mailgun proof (email received):**  
-![Mailgun email success](screenshots/mailgun_notifications%20work%20.png)
+![Mailgun email success](github_action_project/mailgun_notifications%20work%20.png)
 
 ✅ **Safer scraping pace**  
 Waits ~1.5 seconds between companies.
@@ -81,7 +81,7 @@ Waits ~1.5 seconds between companies.
 Runs automatically on a schedule and can commit updated `seen_jobs.json` back to the repo.
 
 **Automation proof (runs in Actions):**  
-![GitHub Actions scheduled runs](screenshots/actions_result.png)
+![GitHub Actions scheduled runs](github_action_project/actions_result.png)
 
 ---
 
@@ -135,9 +135,9 @@ Then it:
 - extracts the real URL from that format
 
 **Proof (script logs running inside automation):**  
-![Script logs - Google queries + retry](screenshots/script_result.png)
+![Script logs - Google queries + retry](github_action_project/script_result.png)
 
-![Script logs - continued](screenshots/script_result_2.png)
+![Script logs - continued](github_action_project/script_result_2.png)
 
 ### Step 5: Clean + filter links
 The script drops:
@@ -182,7 +182,7 @@ Extra smart check included:
 - If you paste an API key without `key-`, it auto-fixes it.
 
 **Proof (workflow shows email sent):**  
-![Workflow shows email sent](screenshots/script_result_3.png)
+![Workflow shows email sent](github_action_project/script_result_3.png)
 
 ### Step 9: Save `seen_jobs.json`
 At the end:
@@ -201,7 +201,7 @@ So next run = no repeats.
 ├── seen_jobs.json
 ├── requirements.txt
 ├── render.yaml
-└── screenshots/
+└── github_action_project/
     ├── actions_result.png
     ├── mailgun_notifications work .png
     ├── script_result.png
